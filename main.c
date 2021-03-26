@@ -93,6 +93,15 @@ int file_ready = 0;
 extern uint8_t rtext[4096];
 extern uint8_t name[10];
 float * out_img;
+float val1;
+float val2;
+int idx = 0;
+float temp = 0;
+float temp_input;
+float pool_test[] = {1,4.5,2,3.5,3,2.5,4,1.5,5,8.5,6,7.5,7,6.5,8,5.5,9,12.5,10,11.5,11,10.5,12,9.5,13,16.5,14,15.5,15,14.5,16,13.5};
+float dense_test[] = {1.5,2.5,3.5,4.5,5.5,2.5,3.5,4.5,5.5,6.5,3.5,4.5,5.5,6.5,7.5,4.5,5.5,6.5,7.5,8.5,5.5,6.5,7.5,8.5,9.5,6.5,7.5,8.5,9.5,10.5,7.5,8.5,9.5,10.5,11.5,8.5,9.5,10.5,11.5,12.5};
+int y = 0;
+
 /* USER CODE END 0 */
 
 /**
@@ -102,6 +111,118 @@ float * out_img;
 int main(void)
 {
   /* USER CODE BEGIN 1 */
+
+                void dense(float input[], float kernel[], float bias[], float output[], int input_size, int output_size)
+                {
+
+                    //dense
+                    for (int i = 0; i < output_size; i++)
+                    {
+                        output[i] = 0;
+                        for (size_t j = 0; j < input_size; j++)
+                        {
+                            output[i] += (kernel[y] * input[j])/16;
+                            y++;
+
+
+
+                        }
+
+                        output[i] += bias[i];
+                       if(output[i]<0)
+                        output[i]=0;
+
+
+                    }
+
+
+
+                    // softmax(probability)
+                    double sum = 0;
+                    for (int i = 0; i < output_size; i++)
+                    {
+                        sum += exp(output[i]);
+                    }
+                    for (int j = 0; j < output_size; j++)
+                    {
+                        output[j] = exp(output[j]) / sum;
+                    }
+                }
+
+
+                void conv(float input[], float output[], int num_of_filters, int input_height, int input_width, int layers, int f_height, int f_width, float bias[], float weights[]) {
+                                float *p = (float *)malloc(layers*(input_width + 2)*(input_width + 2)*sizeof(float));
+                                int temp_index = 0;
+                                float temp = 0;
+                                int idx = 0;
+
+                                for(int q = 0; q < layers; q++) {
+                                                for(int o = 0; o < (input_width + 2)*(input_width + 2); o++) {
+                                                                if(o < input_width + 2 || o > (input_width + 2)*(input_width + 1)) {
+                                                                                p[o + q*(input_width + 2)*(input_width + 2)] = 0;
+                                                                } else if(o % (input_width + 2) == 0 || (o+1) % (input_width + 2) == 0) {
+                                                                                p[o + q*(input_width + 2)*(input_width + 2)] = 0;
+                                                                } else {
+                                                                                p[o + q*(input_width + 2)*(input_width + 2)] = input[temp_index];
+                                                                                temp_index++;
+                                                                }
+                                                }
+                                }
+
+
+                                for(int i = 0; i < num_of_filters; i++) {
+                                                for(int j = 0; j < input_height; j++) {
+                                                                for(int k = 0; k < input_width; k++) {
+                                                                                for (int l = 0; l < layers; l++) {
+                                                                                                for (int m = 0, n = 0; m < f_height*f_width; m++, n++) {
+                                                                                                                if (m % f_width == 0 && m != 0) {
+                                                                                                                                n = n + (input_width+2) - f_width;
+                                                                                                                }
+                                                                                                                temp = temp + weights[l*f_height*f_width + m + i * layers*f_height*f_width]*p[k + n + j *(input_width+2) + l*(input_width + 2)*(input_width + 2)];
+                                                                                                }
+                                                                                }
+                                                                                if(temp+bias[i]>0)
+                                                                                output[idx] = temp + bias[i];
+                                                                                else
+                                                                               output[idx] = 0;
+                                                                                idx++;
+                                                                                temp = 0;
+                                                                }
+                                                }
+                                }
+                                free(p);
+                }
+
+void nn_pool(float input[], float output[], int height, int width, int channel) {
+                float val1;
+                float val2;
+                int l = 0;
+                for(int k = 0; k < channel; k++) {
+                                for(int i = 0; i < height; i = i + 2) {
+                                                for(int j = 0; j < width; j = j + 2) {
+
+                                                                                                                if(input[j + i*width + k*height*width] < input[j + 1 + i*width + k*height*width]) { // compare first and second values
+                                                                                                                                val1 = input[j + 1 + i*width + k*height*width];
+                                                                                                                } else {
+                                                                                                                                val1 = input[j + i*width + k*height*width];
+                                                                                                                }
+                                                                                                                if(input[j + width + i*width + k*height*width] < input[j + 1 + width + i*width + k*height*width]) { // compare third and fourth values
+                                                                                                                                val2 = input[j + 1 + width + i*width + k*height*width];
+                                                                                                                } else {
+                                                                                                                                val2 = input[j + width + i*width + k*height*width];
+                                                                                                                }
+                                                                                                                if(val1 < val2) {
+                                                                                                                                output[l] = val2;
+                                                                                                                                l++;
+                                                                                                                } else {
+                                                                                                                                output[l] = val1;
+                                                                                                                                l++;
+                                                                                                                }
+                                                }
+                                }
+                }
+}
+
 
   /* USER CODE END 1 */
 
@@ -133,41 +254,232 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
-  while (1)
-  {
+ // while (1)
+ // {
     /* USER CODE END WHILE */
-    MX_USB_HOST_Process();
+  /*  MX_USB_HOST_Process();
 
-    /* USER CODE BEGIN 3 */
-	sprintf(name,"num5.bmp");
+    /* USER CODE BEGIN 3
+                sprintf(name,"num3.bmp");
     file_ready = 0;
     read_bmp(name);
-    if(file_ready == 1){
-		out_img = ProcessBmp(rtext);
-	    break;
+    if(file_ready == 1)
+    {
+                out_img = ProcessBmp(rtext);
+                    break;
     }
   }
-
   printf("Hello World\n");
-  for(int i = 0; i < 28; i++){
-	for(int j = 0; j < 28; j++){
-		printf("%.0f ", out_img[i*28 + j]);
-	}
-	printf("\n ");
-  }
+   for(int i = 0; i < 28; i++){
+ 	for(int j = 0; j < 28; j++){
+ 		printf("%.0f ", out_img[i*28 + j]);
+ 	}
+ 	printf("\n ");
+   }
 
-  // read in parameters
-  sprintf(name,"b1.txt");
-  float * b1 = read_txt(name, 4);
+ sprintf(name,"b1.txt");
+float * b1 = read_txt(name, 4);
+
 
   sprintf(name,"w1.txt");
-  float * w1 = read_txt(name, 36);
+  float * w1= read_txt(name, 36);
+
+  sprintf(name,"b2.txt");
+  float * b2 = read_txt(name, 8);
+
+  sprintf(name,"w2.txt");
+  float * w2 = read_txt(name, 288);
+
+  sprintf(name,"b3.txt");
+  float * b3 = read_txt(name, 16);
+
+  sprintf(name,"w3.txt");
+  float * w3 = read_txt(name, 1152);
 
   sprintf(name,"bc.txt");
   float * bc = read_txt(name, 10);
 
   sprintf(name,"fc.txt");
-  float * fc = read_txt(name, 1960);
+
+  float * fc = read_txt(name, 160);
+
+
+
+  float* output1 = (float *)malloc(3136*sizeof(float));
+  conv(out_img,output1,4,28,28,1,3,3,b1,w1);
+  free(w1);
+  free(b1);
+
+
+  float* output2 = (float *)malloc(784*sizeof(float));
+  nn_pool(output1,output2,28,28,4);
+  free(output1);
+
+
+  float* output3 = (float *)malloc(1568*sizeof(float));
+  conv(output2,output3,8,14,14,4,3,3,b2,w2);
+  free(b2);
+   free(w2);
+  free(output2);
+
+  float* output4 = (float *)malloc(392*sizeof(float));
+  nn_pool(output3,output4,14,14,8);
+
+  free(output3);
+
+  float* output5 = (float *)malloc(784*sizeof(float));
+  conv(output4,output5,16,7,7,8,3,3,b3,w3);
+  free(b3);
+   free(w3);
+   free(output4);
+
+
+
+  float* output6 = (float *)malloc(144*sizeof(float));
+  nn_pool(output5,output6,7,7,16);
+
+  free(output5);
+
+
+
+
+  float* output7 = (float *)malloc(16*sizeof(float));
+  nn_pool(output6,output7,3,3,16);
+  free(output6);
+
+
+
+
+  float* output8 = (float *)malloc(10*sizeof(float));
+  dense(output7,fc,bc,output8,16,10);
+  free(output7);
+  for(int l = 0; l < 10; l++) {
+  printf("prediction of number %d is %.5f\n", l, output8[l]);
+  HAL_Delay(10);
+  }
+    free(output8);
+    printf("Hello World\n");
+
+
+
+
+*/
+
+
+
+
+
+
+
+
+
+
+
+  // Test Conv function 1
+
+
+  float input[] = {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1};
+  float weights[] ={1,2,3,4,5,6,7,8,9,3,3,3,3,3,3,3,3,3};
+  float output[50];
+  float bias[] = {0.5,1};
+  conv(input, output, 2, 5,5,1,3,3,bias,weights);
+  HAL_Delay(1000);
+  int idx=0;
+  for(int l = 0; l < 10; l++)
+   {
+
+	  for(int i=0;i<5;i++)
+	  {
+		  printf("%.2f ", output[idx]);
+    idx++;
+	  }
+
+	  printf("\n");
+
+    HAL_Delay(10);
+   }
+
+
+
+//test conv function 2
+
+ /*float input[] = {1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,2.5,2.5,2.5,2.5,2.5,2.5,2.5,2.5,2.5,2.5,2.5,2.5,2.5,2.5,2.5,2.5,2.5,2.5,2.5,2.5,2.5,2.5,2.5,2.5,2.5};
+  float output[75];
+  float bias[] = {0.5,1,2.5};
+  float weights[] = {1,2,3,4,5,6,7,8,9,1,1,1,1,1,1,1,1,1,3,3,3,3,3,3,3,3,3,2,2,2,2,2,2,2,2,2,5,5,5,5,5,5,5,5,5,0,0,0,0,0,0,0,0,0};
+  conv(input, output, 3, 5, 5, 2, 3, 3, bias, weights);
+
+  for(int l = 0; l < 75; l++)
+  {
+
+	  printf(" number %d is %.4f\n", l,output[l]);
+	      HAL_Delay(10);
+
+   }
+  int idx=0;
+    for(int l = 0; l < 15; l++)
+     {
+    	if(l%5==0)
+    		 printf("\n");
+
+  	  for(int i=0;i<5;i++)
+  	  {
+  		  printf("%.2f ", output[idx]);
+      idx++;
+  	  }
+
+  	  printf("\n");
+
+      HAL_Delay(10);
+     }
+// Test nn pool
+ /*float input[] = {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,4.5,3.5,2.5,1.5,8.5,7.5,6.5,5.5,12.5,11.5,10.5,9.5,16.5,15.5,14.5,13.5};
+float output[8];
+  nn_pool(input,output,4,4,2);
+  for(int l = 0; l < 8; l++)
+    {
+
+
+     printf(" number %d is %.4f\n", l,output[l]);
+     HAL_Delay(10);
+
+     }
+  while(1)
+     {}
+ //Test dense function
+
+ /* float input[] = {2,2,3,2,4.5,3,3,2.2};
+  float output[10];
+  float bias[] = {0,1,2,3,4,5,6,7,8,9};
+  float kernel[] = { 1. ,  1.5,  2. ,  2.5,  3. ,  3.5,  4. ,  4.5,  5. ,  5.5,
+       2. ,  2.5,  3. ,  3.5,  4. ,  4.5,  5. ,  5.5,  6. ,  6.5,
+       3. ,  3.5,  4. ,  4.5,  5. ,  5.5,  6. ,  6.5,  7. ,  7.5,
+       4. ,  4.5,  5. ,  5.5,  6. ,  6.5,  7. ,  7.5,  8. ,  8.5,
+       5. ,  5.5,  6. ,  6.5,  7. ,  7.5,  8. ,  8.5,  9. ,  9.5,
+       6. ,  6.5,  7. ,  7.5,  8. ,  8.5,  9. ,  9.5, 10. , 10.5,
+       7. ,  7.5,  8. ,  8.5,  9. ,  9.5, 10. , 10.5, 11. , 11.5,
+       8. ,  8.5,  9. ,  9.5, 10. , 10.5, 11. , 11.5, 12. , 12.5};
+
+  dense(input,kernel,bias,output,8,10);
+  for(int l = 0; l < 10; l++)
+      {
+
+
+       printf("prediction of number %d is %.4f\n", l,output[l]);
+       HAL_Delay(10);
+
+       }
+    while(1)
+       {}
+
+
+
+
+
+
+
+
+
   /* USER CODE END 3 */
 }
 
